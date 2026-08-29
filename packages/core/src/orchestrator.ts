@@ -239,7 +239,14 @@ export class Orchestrator {
       (execution) => execution.status === 'skipped',
     );
 
-    run.status = hasFailed ? 'failed' : hasSkipped ? 'partial' : 'completed';
+    const continuedFailure =
+      hasFailed && task.workflowDefinition.onStepError === 'continue';
+
+    run.status = hasFailed && !continuedFailure
+      ? 'failed'
+      : hasSkipped || continuedFailure
+        ? 'partial'
+        : 'completed';
     run.completedAt = now();
 
     const finalStepId =

@@ -7,6 +7,7 @@ import type {
   Task,
   WorkflowStep,
 } from '../src/types.js';
+import { LocalHandlerRuntime } from '../src/agentRuntime.js';
 import type { AgentRuntime } from '../src/agentRuntime.js';
 import type { Persistence } from '../src/persistence.js';
 
@@ -358,5 +359,170 @@ describe('Orchestrator validation', () => {
     ]);
 
     await expect(orchestrator.execute(task)).rejects.toThrow(/future or current step/i);
+  });
+});
+
+describe('LocalHandlerRuntime', () => {
+  it('executes a concrete local handler end-to-end across two steps', async () => {
+    const persistence = createPersistence();
+    const runtime = new LocalHandlerRuntime({
+      handlers: {
+        'step-1-agent': (input) => ({
+          value: `${String((input as Record<string, unknown>).message)}-processed`,
+        }),
+        'step-2-agent': (input) => {
+          const artifact = (input as Record<string, unknown>).value as Record<string, unknown>;
+          const previousValue = artifact.content as Record<string, unknown>;
+          return { value: `final:${String(previousValue.value)}` };
+        },
+      },
+    });
+
+    const orchestrator = new Orchestrator({
+      persistence,
+      runtime,
+      generateId: (() => {
+        let counter = 0;
+        return () => `runtime-${++counter}`;
+      })(),
+      now: () => '2026-08-30T00:00:00.000Z',
+    });
+
+    const task: Task = {
+      id: 'task-runtime-e2e',
+      userId: 'user-1',
+      input: { message: 'hello' },
+      workflowDefinition: {
+        steps: [
+          {
+            id: 'step-1',
+            agentVersionId: 'step-1-agent',
+            inputMapping: { message: '$input.message' },
+          },
+          {
+            id: 'step-2',
+            agentVersionId: 'step-2-agent',
+            inputMapping: { value: '$prev.step-1.0' },
+          },
+        ],
+        onStepError: 'abort',
+        finalStepId: 'step-2',
+      },
+      status: 'pending',
+      createdAt: '2026-08-29T00:00:00.000Z',
+      updatedAt: '2026-08-29T00:00:00.000Z',
+    };
+
+    const result = await orchestrator.execute(task);
+
+    expect(result.executions).toHaveLength(2);
+    expect(result.artifacts).toHaveLength(2);
+    expect(result.executions.every((execution) => execution.status === 'completed')).toBe(true);
+    expect(result.run.status).toBe('completed');
+    expect(result.task.status).toBe('completed');
+    expect(result.run.finalArtifactId).toBe('artifact-step-2');
+    expect(result.artifacts[1].content).toEqual({ value: 'final:hello-processed' });
+  });
+
+  it('preserves abort semantics when a local handler fails', async () => {
+    const persistence = createPersistence();
+    const runtime = new LocalHandlerRuntime({
+      handlers: {
+        'failing-agent': () => {
+          throw new Error('boom');
+        },
+        'ok-agent': (input) => ({ value: (input as Record<string, unknown>).message }),
+      },
+    });
+
+    const orchestrator = new Orchestrator({
+      persistence,
+      runtime,
+      generateId: () => 'runtime-fail',
+      now: () => '2026-08-30T00:00:00.000Z',
+    });
+
+    const task: Task = {
+      id: 'task-runtime-abort',
+      userId: 'user-1',
+      input: { message: 'hello' },
+      workflowDefinition: {
+        steps: [
+          {
+            id: 'step-1',
+            agentVersionId: 'failing-agent',
+            inputMapping: { value: '$input.message' },
+          },
+          {
+            id: 'step-2',
+            agentVersionId: 'ok-agent',
+            inputMapping: { message: '$input.message' },
+          },
+        ],
+        onStepError: 'abort',
+        finalStepId: 'step-2',
+      },
+      status: 'pending',
+      createdAt: '2026-08-29T00:00:00.000Z',
+      updatedAt: '2026-08-29T00:00:00.000Z',
+    };
+
+    const result = await orchestrator.execute(task);
+
+    expect(result.executions).toHaveLength(1);
+    expect(result.executions[0].status).toBe('failed');
+    expect(result.run.status).toBe('failed');
+    expect(result.task.status).toBe('failed');
+  });
+
+  it('preserves continue semantics when a local handler fails', async () => {
+    const persistence = createPersistence();
+    const runtime = new LocalHandlerRuntime({
+      handlers: {
+        'failing-agent': () => {
+          throw new Error('boom');
+        },
+        'ok-agent': (input) => ({ value: (input as Record<string, unknown>).message }),
+      },
+    });
+
+    const orchestrator = new Orchestrator({
+      persistence,
+      runtime,
+      generateId: () => 'runtime-continue',
+      now: () => '2026-08-30T00:00:00.000Z',
+    });
+
+    const task: Task = {
+      id: 'task-runtime-continue',
+      userId: 'user-1',
+      input: { message: 'hello' },
+      workflowDefinition: {
+        steps: [
+          {
+            id: 'step-1',
+            agentVersionId: 'failing-agent',
+            inputMapping: { value: '$input.message' },
+          },
+          {
+            id: 'step-2',
+            agentVersionId: 'ok-agent',
+            inputMapping: { message: '$input.message' },
+          },
+        ],
+        onStepError: 'continue',
+        finalStepId: 'step-2',
+      },
+      status: 'pending',
+      createdAt: '2026-08-29T00:00:00.000Z',
+      updatedAt: '2026-08-29T00:00:00.000Z',
+    };
+
+    const result = await orchestrator.execute(task);
+
+    expect(result.executions).toHaveLength(2);
+    expect(result.executions[0].status).toBe('failed');
+    expect(result.executions[1].status).toBe('completed');
+    expect(result.run.status).toBe('partial');
   });
 });
