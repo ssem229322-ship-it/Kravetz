@@ -362,6 +362,172 @@ describe('Orchestrator validation', () => {
   });
 });
 
+describe('Execution containment', () => {
+  it('marks a hanging handler as failed instead of waiting indefinitely', async () => {
+    const persistence = createPersistence();
+    const runtime = new LocalHandlerRuntime({
+      handlers: {
+        'slow-agent': async () => {
+          await new Promise(() => undefined);
+          return { value: 'never' };
+        },
+      },
+    });
+
+    const orchestrator = new Orchestrator({
+      persistence,
+      runtime,
+      generateId: (() => {
+        let counter = 0;
+        return () => `timeout-${++counter}`;
+      })(),
+      now: () => '2026-08-30T00:00:00.000Z',
+    });
+
+    const task: Task = {
+      id: 'task-timeout',
+      userId: 'user-1',
+      input: { message: 'hello' },
+      workflowDefinition: {
+        steps: [
+          {
+            id: 'step-1',
+            agentVersionId: 'slow-agent',
+            inputMapping: { message: '$input.message' },
+          },
+        ],
+        onStepError: 'abort',
+        finalStepId: 'step-1',
+      },
+      status: 'pending',
+      createdAt: '2026-08-29T00:00:00.000Z',
+      updatedAt: '2026-08-29T00:00:00.000Z',
+    };
+
+    const start = Date.now();
+    const result = await orchestrator.execute(task, { timeoutMs: 50 });
+    const elapsed = Date.now() - start;
+
+    expect(elapsed).toBeLessThan(1000);
+    expect(result.executions).toHaveLength(1);
+    expect(result.executions[0].status).toBe('failed');
+    expect(result.executions[0].error).toBe('timeout');
+    expect(result.run.status).toBe('failed');
+    expect(result.task.status).toBe('failed');
+  });
+
+  it('preserves abort semantics when a step times out', async () => {
+    const persistence = createPersistence();
+    const runtime = new LocalHandlerRuntime({
+      handlers: {
+        'slow-agent': async () => {
+          await new Promise(() => undefined);
+          return { value: 'never' };
+        },
+        'ok-agent': (input) => ({ value: (input as Record<string, unknown>).message }),
+      },
+    });
+
+    const orchestrator = new Orchestrator({
+      persistence,
+      runtime,
+      generateId: (() => {
+        let counter = 0;
+        return () => `abort-${++counter}`;
+      })(),
+      now: () => '2026-08-30T00:00:00.000Z',
+    });
+
+    const task: Task = {
+      id: 'task-timeout-abort',
+      userId: 'user-1',
+      input: { message: 'hello' },
+      workflowDefinition: {
+        steps: [
+          {
+            id: 'step-1',
+            agentVersionId: 'slow-agent',
+            inputMapping: { message: '$input.message' },
+          },
+          {
+            id: 'step-2',
+            agentVersionId: 'ok-agent',
+            inputMapping: { message: '$input.message' },
+          },
+        ],
+        onStepError: 'abort',
+        finalStepId: 'step-2',
+      },
+      status: 'pending',
+      createdAt: '2026-08-29T00:00:00.000Z',
+      updatedAt: '2026-08-29T00:00:00.000Z',
+    };
+
+    const result = await orchestrator.execute(task, { timeoutMs: 50 });
+
+    expect(result.executions).toHaveLength(1);
+    expect(result.executions[0].status).toBe('failed');
+    expect(result.executions[0].error).toBe('timeout');
+    expect(result.run.status).toBe('failed');
+  });
+
+  it('preserves continue semantics when a step times out', async () => {
+    const persistence = createPersistence();
+    const runtime = new LocalHandlerRuntime({
+      handlers: {
+        'slow-agent': async () => {
+          await new Promise(() => undefined);
+          return { value: 'never' };
+        },
+        'ok-agent': (input) => ({ value: (input as Record<string, unknown>).message }),
+      },
+    });
+
+    const orchestrator = new Orchestrator({
+      persistence,
+      runtime,
+      generateId: (() => {
+        let counter = 0;
+        return () => `continue-${++counter}`;
+      })(),
+      now: () => '2026-08-30T00:00:00.000Z',
+    });
+
+    const task: Task = {
+      id: 'task-timeout-continue',
+      userId: 'user-1',
+      input: { message: 'hello' },
+      workflowDefinition: {
+        steps: [
+          {
+            id: 'step-1',
+            agentVersionId: 'slow-agent',
+            inputMapping: { message: '$input.message' },
+          },
+          {
+            id: 'step-2',
+            agentVersionId: 'ok-agent',
+            inputMapping: { message: '$input.message' },
+          },
+        ],
+        onStepError: 'continue',
+        finalStepId: 'step-2',
+      },
+      status: 'pending',
+      createdAt: '2026-08-29T00:00:00.000Z',
+      updatedAt: '2026-08-29T00:00:00.000Z',
+    };
+
+    const result = await orchestrator.execute(task, { timeoutMs: 50 });
+
+    expect(result.executions).toHaveLength(2);
+    expect(result.executions[0].status).toBe('failed');
+    expect(result.executions[0].error).toBe('timeout');
+    expect(result.executions[1].status).toBe('completed');
+    expect(result.run.status).toBe('partial');
+  });
+});
+
 describe('LocalHandlerRuntime', () => {
   it('executes a concrete local handler end-to-end across two steps', async () => {
     const persistence = createPersistence();

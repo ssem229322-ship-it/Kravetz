@@ -7,6 +7,7 @@ import {
 export interface AgentRuntimeInput {
   execution: AgentExecution;
   step: WorkflowStep;
+  signal?: AbortSignal;
 }
 
 export interface AgentRuntimeResult {
@@ -25,7 +26,7 @@ export interface LocalHandlerRuntimeOptions {
 export class LocalHandlerRuntime implements AgentRuntime {
   constructor(private readonly options: LocalHandlerRuntimeOptions) {}
 
-  async execute({ execution, step }: AgentRuntimeInput): Promise<AgentRuntimeResult> {
+  async execute({ execution, step, signal }: AgentRuntimeInput): Promise<AgentRuntimeResult> {
     const handler = this.options.handlers[step.agentVersionId];
 
     if (!handler) {
@@ -40,7 +41,38 @@ export class LocalHandlerRuntime implements AgentRuntime {
     }
 
     try {
-      const content = handler(execution.input);
+      const content = await new Promise<unknown>((resolve, reject) => {
+        const onAbort = () => {
+          reject(new Error('timeout'));
+        };
+
+        if (signal) {
+          signal.addEventListener('abort', onAbort, { once: true });
+        }
+
+        try {
+          const maybeResult = handler(execution.input);
+          Promise.resolve(maybeResult)
+            .then((value) => {
+              if (signal) {
+                signal.removeEventListener('abort', onAbort);
+              }
+              resolve(value);
+            })
+            .catch((error) => {
+              if (signal) {
+                signal.removeEventListener('abort', onAbort);
+              }
+              reject(error);
+            });
+        } catch (error) {
+          if (signal) {
+            signal.removeEventListener('abort', onAbort);
+          }
+          reject(error);
+        }
+      });
+
       const artifact: Artifact = {
         id: `artifact-${step.id}`,
         runId: execution.runId,
@@ -58,11 +90,12 @@ export class LocalHandlerRuntime implements AgentRuntime {
         artifacts: [artifact],
       };
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       return {
         execution: {
           ...execution,
           status: 'failed',
-          error: error instanceof Error ? error.message : String(error),
+          error: message === 'timeout' ? 'timeout' : message,
         },
         artifacts: [],
       };

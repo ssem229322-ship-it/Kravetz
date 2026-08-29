@@ -14,6 +14,10 @@ export interface OrchestratorDependencies {
   now: () => string;
 }
 
+export interface OrchestratorExecuteOptions {
+  timeoutMs?: number;
+}
+
 export interface OrchestratorResult {
   task: Task;
   run: Run;
@@ -98,9 +102,13 @@ export class Orchestrator {
     }
   }
 
-  async execute(task: Task): Promise<OrchestratorResult> {
+  async execute(
+    task: Task,
+    options: OrchestratorExecuteOptions = {},
+  ): Promise<OrchestratorResult> {
     const { persistence, runtime, generateId, now } = this.deps;
     Orchestrator.validateWorkflow(task);
+    const timeoutMs = options.timeoutMs ?? 30000;
 
     const run: Run = {
       id: generateId(),
@@ -178,10 +186,16 @@ export class Orchestrator {
       execution.status = 'running';
       await persistence.executions.create(execution);
 
+      const controller = new AbortController();
+      const timeoutHandle = setTimeout(() => {
+        controller.abort();
+      }, timeoutMs);
+
       try {
         const result = await runtime.execute({
           execution,
           step,
+          signal: controller.signal,
         });
 
         const producedArtifacts = result.artifacts ?? [];
@@ -218,8 +232,11 @@ export class Orchestrator {
         }
       } catch (error) {
         execution.status = 'failed';
-        execution.error =
+        const errorMessage =
           error instanceof Error ? error.message : String(error);
+        execution.error = /timeout|abort/i.test(errorMessage)
+          ? 'timeout'
+          : errorMessage;
 
         await persistence.executions.update(execution);
         executions.push(execution);
@@ -229,6 +246,8 @@ export class Orchestrator {
         if (task.workflowDefinition.onStepError === 'abort') {
           break;
         }
+      } finally {
+        clearTimeout(timeoutHandle);
       }
     }
 
