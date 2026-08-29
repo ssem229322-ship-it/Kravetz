@@ -24,8 +24,83 @@ export interface OrchestratorResult {
 export class Orchestrator {
   constructor(private readonly deps: OrchestratorDependencies) {}
 
+  private static resolveInputField(
+    input: Record<string, unknown>,
+    path: string,
+  ): unknown {
+    return path.split('.').reduce<unknown>((current, segment) => {
+      if (current === null || current === undefined || typeof current !== 'object') {
+        return undefined;
+      }
+
+      return (current as Record<string, unknown>)[segment];
+    }, input as unknown);
+  }
+
+  private static validateWorkflow(task: Task): void {
+    const steps = task.workflowDefinition.steps;
+
+    if (steps.length === 0) {
+      throw new Error('Workflow definition must contain at least one step');
+    }
+
+    const stepIds = new Set<string>();
+    for (const step of steps) {
+      if (stepIds.has(step.id)) {
+        throw new Error(`Duplicate step id "${step.id}" in workflow definition`);
+      }
+      stepIds.add(step.id);
+    }
+
+    const finalStepId = task.workflowDefinition.finalStepId;
+    if (!finalStepId || !steps.some((step) => step.id === finalStepId)) {
+      throw new Error(
+        `Workflow finalStepId "${String(finalStepId)}" does not match any step id`,
+      );
+    }
+
+    for (let index = 0; index < steps.length; index += 1) {
+      const step = steps[index];
+
+      for (const [key, mapping] of Object.entries(step.inputMapping)) {
+        if (mapping.startsWith('$input.')) {
+          const field = mapping.slice('$input.'.length);
+          const value = this.resolveInputField(task.input, field);
+
+          if (value === undefined) {
+            throw new Error(
+              `Step "${step.id}" references missing $input field "${field}" for key "${key}"`,
+            );
+          }
+
+          continue;
+        }
+
+        if (!mapping.startsWith('$prev.')) {
+          continue;
+        }
+
+        const dependencyId = mapping.slice('$prev.'.length).split('.')[0];
+        const dependencyIndex = steps.findIndex((candidate) => candidate.id === dependencyId);
+
+        if (dependencyIndex === -1) {
+          throw new Error(
+            `Step "${step.id}" references unknown $prev step "${dependencyId}" for key "${key}"`,
+          );
+        }
+
+        if (dependencyIndex >= index) {
+          throw new Error(
+            `Step "${step.id}" references a future or current step "${dependencyId}" via $prev`,
+          );
+        }
+      }
+    }
+  }
+
   async execute(task: Task): Promise<OrchestratorResult> {
     const { persistence, runtime, generateId, now } = this.deps;
+    Orchestrator.validateWorkflow(task);
 
     const run: Run = {
       id: generateId(),

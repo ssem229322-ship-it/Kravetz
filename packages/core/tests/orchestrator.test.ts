@@ -275,3 +275,88 @@ describe('Orchestrator E2E - two step workflow', () => {
     expect(artifacts).toHaveLength(2);
   });
 });
+
+describe('Orchestrator validation', () => {
+  it('rejects duplicate step ids in the workflow definition', async () => {
+    const orchestrator = new Orchestrator({
+      persistence: createPersistence(),
+      runtime: createRuntime(),
+      generateId: () => 'id-1',
+      now: () => '2026-01-01T00:00:00.000Z',
+    });
+
+    const task = createTask([
+      { id: 'step-1', agentVersionId: 'agent-v1', inputMapping: {} },
+      { id: 'step-1', agentVersionId: 'agent-v2', inputMapping: {} },
+    ]);
+
+    await expect(orchestrator.execute(task)).rejects.toThrow(/duplicate step id/i);
+  });
+
+  it('rejects missing $input fields before running steps', async () => {
+    const orchestrator = new Orchestrator({
+      persistence: createPersistence(),
+      runtime: createRuntime(),
+      generateId: () => 'id-1',
+      now: () => '2026-01-01T00:00:00.000Z',
+    });
+
+    const task = createTask([
+      {
+        id: 'step-1',
+        agentVersionId: 'agent-v1',
+        inputMapping: { message: '$input.missingField' },
+      },
+    ]);
+
+    await expect(orchestrator.execute(task)).rejects.toThrow(/\$input.*missingField/i);
+  });
+
+  it('rejects unknown $prev step references before running steps', async () => {
+    const orchestrator = new Orchestrator({
+      persistence: createPersistence(),
+      runtime: createRuntime(),
+      generateId: () => 'id-1',
+      now: () => '2026-01-01T00:00:00.000Z',
+    });
+
+    const task = createTask([
+      {
+        id: 'step-1',
+        agentVersionId: 'agent-v1',
+        inputMapping: { output: '$prev.missing-step' },
+      },
+    ]);
+
+    await expect(orchestrator.execute(task)).rejects.toThrow(/\$prev.*missing-step/i);
+  });
+
+  it('rejects $prev references to future steps according to current execution semantics', async () => {
+    const orchestrator = new Orchestrator({
+      persistence: createPersistence(),
+      runtime: createRuntime(),
+      generateId: () => 'id-1',
+      now: () => '2026-01-01T00:00:00.000Z',
+    });
+
+    const task = createTask([
+      {
+        id: 'step-1',
+        agentVersionId: 'agent-v1',
+        inputMapping: {},
+      },
+      {
+        id: 'step-2',
+        agentVersionId: 'agent-v2',
+        inputMapping: { output: '$prev.step-3' },
+      },
+      {
+        id: 'step-3',
+        agentVersionId: 'agent-v3',
+        inputMapping: {},
+      },
+    ]);
+
+    await expect(orchestrator.execute(task)).rejects.toThrow(/future or current step/i);
+  });
+});
