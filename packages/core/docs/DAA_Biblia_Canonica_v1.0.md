@@ -93,10 +93,16 @@ interface CanonDaaArtifact {
 | 500 | Server error | Retry with backoff |
 
 ## Security Requirements
-1. All endpoints must use HTTPS
-2. Auth tokens must be >= 16 characters
-3. Requests must validate protocol version
-4. Response signatures should be verified
+1. All endpoints must use HTTPS (TLS 1.2+ required)
+2. Auth tokens must be >= 16 characters and rotated regularly
+3. Requests must:
+   - Validate protocol version
+   - Include X-Canon-Version header
+   - Use Bearer token authentication when configured
+4. Response signatures:
+   - Should be verified if X-Signature header present
+   - Use HMAC-SHA256 by default
+5. Timeouts must be enforced client-side (1000-300000ms)
 
 ## Implementation Notes
 1. The `canon_daa_executing` status indicates the execution was accepted by the CANON system

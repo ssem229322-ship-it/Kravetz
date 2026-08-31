@@ -94,9 +94,48 @@ export class CanonDaaRuntime implements AgentRuntime {
     try {
       execution.status = 'canon_daa_executing';
       
-      // TODO: Implement actual CANON DAA API integration
-      // This would make HTTP requests to the CANON DAA endpoint
-      // using execution.canonDaaConfig and this.options
+      const { authToken, endpoint } = execution.canonDaaConfig;
+      const url = `${endpoint}/execute`;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'X-Canon-Version': protocolVersion,
+      };
+      
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          executionId: execution.id,
+          stepId: step.id,
+          input: execution.input,
+          config: {
+            timeoutMs: effectiveTimeout,
+            metadata: {
+              runId: execution.runId,
+              taskId: execution.runId // Assuming run has taskId
+            }
+          }
+        }),
+        signal
+      });
+
+      if (!response.ok) {
+        throw new Error(`CANON DAA error: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      // Verify response signature if configured
+      if (this.options.verifySignature) {
+        const signature = response.headers.get('X-Signature');
+        if (!signature || !this.verifyResponse(result, signature)) {
+          throw new Error('Invalid response signature');
+        }
+      }
 
       const artifact: Artifact = {
         id: `canon-daa-result-${execution.id}`,
@@ -121,11 +160,19 @@ export class CanonDaaRuntime implements AgentRuntime {
         artifacts: [artifact],
       };
     } catch (error) {
+      let errorMessage = 'Unknown CANON DAA error';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+
       return {
         execution: {
           ...execution,
           status: 'failed',
-          error: error instanceof Error ? error.message : String(error),
+          error: `CANON_DAA_FAILURE: ${errorMessage}`,
+          latencyMs: Date.now() - startTime,
         },
         artifacts: [],
       };
