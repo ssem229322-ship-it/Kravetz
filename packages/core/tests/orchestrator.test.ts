@@ -313,6 +313,7 @@ describe('Orchestrator validation', () => {
     await expect(orchestrator.execute(task)).rejects.toThrow(/\$input.*missingField/i);
   });
 
+ 
   it('rejects unknown $prev step references before running steps', async () => {
     const orchestrator = new Orchestrator({
       persistence: createPersistence(),
@@ -329,7 +330,7 @@ describe('Orchestrator validation', () => {
       },
     ]);
 
-    await expect(orchestrator.execute(task)).rejects.toThrow(/\$prev.*missing-step/i);
+    await expect(orchestrator.execute(task)).rejects.toThrowError(/\$prev.*missing-step/i);
   });
 
   it('rejects $prev references to future steps according to current execution semantics', async () => {
@@ -358,7 +359,7 @@ describe('Orchestrator validation', () => {
       },
     ]);
 
-    await expect(orchestrator.execute(task)).rejects.toThrow(/future or current step/i);
+    await expect(orchestrator.execute(task)).rejects.toThrowError(/future or current step/i);
   });
 
   it('skips transitive dependencies when an upstream step fails', async () => {
