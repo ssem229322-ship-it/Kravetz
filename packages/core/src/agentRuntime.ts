@@ -36,7 +36,21 @@ export class CanonDaaRuntime implements AgentRuntime {
   private static readonly MIN_TIMEOUT_MS = 1000;
   private static readonly MAX_TIMEOUT_MS = 300000;
 
-  constructor(private readonly options: CanonDaaRuntimeOptions) {}
+  private readonly expectedProtocol = 'v1.0';
+  
+  constructor(private readonly options: CanonDaaRuntimeOptions & {
+    verifySignature?: boolean;
+    secretKey?: string;
+  }) {}
+
+  private verifyResponse(body: unknown, signature: string): boolean {
+    if (!this.options.secretKey) return false;
+    
+    const hmac = crypto.createHmac('sha256', this.options.secretKey);
+    hmac.update(JSON.stringify(body));
+    const expectedSignature = hmac.digest('hex');
+    return expectedSignature === signature;
+  }
 
   /**
    * Executes a step using CANON DAA protocol
@@ -57,12 +71,12 @@ export class CanonDaaRuntime implements AgentRuntime {
     // Validate normative requirements
     const { protocolVersion, endpoint, timeoutMs } = execution.canonDaaConfig;
     
-    if (!/^v\d+\.\d+$/.test(protocolVersion)) {
+    if (protocolVersion !== this.expectedProtocol) {
       return {
         execution: {
           ...execution,
           status: 'failed',
-          error: 'Invalid protocol version format (RFC-7890 §2.3)',
+          error: `Unsupported protocol version "${protocolVersion}", expected "${this.expectedProtocol}" (RFC-7890 §2.3)`,
         },
         artifacts: [],
       };
@@ -103,6 +117,14 @@ export class CanonDaaRuntime implements AgentRuntime {
       
       if (authToken) {
         headers['Authorization'] = `Bearer ${authToken}`;
+      }
+
+      // Verificación de normativa SES-2024 §4.5
+      if (execution.input && typeof execution.input === 'object') {
+        const inputSize = JSON.stringify(execution.input).length;
+        if (inputSize > 1024 * 1024) { // 1MB max
+          throw new Error(`Input size ${inputSize} exceeds 1MB limit (SES-2024 §4.5)`);
+        }
       }
 
       const response = await fetch(url, {

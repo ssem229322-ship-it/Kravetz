@@ -71,7 +71,13 @@ export interface AgentExecution {
   outputTokens?: number;
   latencyMs?: number;
   error?: string;
+  /**
+   * @additionalProperties false
+   */
   canonDaaConfig?: {
+    /**
+     * @mustMatch v1.0
+     */
     /**
      * @pattern ^v\d+\.\d+$ Must follow CANON DAA version format
      */
