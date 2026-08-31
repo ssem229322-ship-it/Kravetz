@@ -149,7 +149,9 @@ export class Orchestrator {
       };
 
       if (blockedBy) {
+        execution.status = 'skipped';
         execution.error = `dependency_failed:${blockedBy}`;
+        failedSteps.add(step.id);
         await persistence.executions.create(execution);
         executions.push(execution);
         continue;
