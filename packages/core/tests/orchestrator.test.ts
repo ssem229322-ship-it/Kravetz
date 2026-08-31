@@ -360,6 +360,68 @@ describe('Orchestrator validation', () => {
 
     await expect(orchestrator.execute(task)).rejects.toThrow(/future or current step/i);
   });
+
+  it('skips transitive dependencies when an upstream step fails', async () => {
+    const persistence = createPersistence();
+    const runtime: AgentRuntime = {
+      async execute({ execution, step }) {
+        if (step.id === 'step-1') {
+          return {
+            execution: {
+              ...execution,
+              status: 'failed',
+              error: 'boom',
+              outputArtifactIds: [],
+            },
+            artifacts: [],
+          };
+        }
+
+        const artifact: Artifact = {
+          id: `artifact-${step.id}`,
+          runId: execution.runId,
+          executionId: execution.id,
+          contentType: 'application/json',
+          content: { step: step.id },
+        };
+
+        return {
+          execution: {
+            ...execution,
+            status: 'completed',
+            outputArtifactIds: [artifact.id],
+          },
+          artifacts: [artifact],
+        };
+      },
+    };
+
+    const orchestrator = new Orchestrator({
+      persistence,
+      runtime,
+      generateId: (() => {
+        let counter = 0;
+        return () => `transitive-${++counter}`;
+      })(),
+      now: () => '2026-01-01T00:00:00.000Z',
+    });
+
+    const task = createTask([
+      { id: 'step-1', agentVersionId: 'agent-a', inputMapping: {} },
+      { id: 'step-2', agentVersionId: 'agent-b', inputMapping: { value: '$prev.step-1' } },
+      { id: 'step-3', agentVersionId: 'agent-c', inputMapping: { value: '$prev.step-2' } },
+    ], 'continue');
+  
+    const result = await orchestrator.execute(task);
+
+    expect(result.executions.map((execution) => execution.status)).toEqual([
+      'failed',
+      'skipped',
+      'skipped',
+    ]);
+    expect(result.executions[2].error).toBe('dependency_failed:step-2');
+    expect(result.run.status).toBe('partial');
+  });
 });
 
 describe('Execution containment', () => {
