@@ -11,6 +11,7 @@ import {
   WorkflowDefinition 
 } from './types';
 
+ 
 class Core {
   private tasks: Task[] = [];
   private runs: Run[] = [];
