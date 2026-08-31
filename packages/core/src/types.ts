@@ -17,7 +17,8 @@ export type ExecutionStatus =
   | 'running'
   | 'completed'
   | 'failed'
-  | 'skipped';
+  | 'skipped'
+  | 'canon_daa_executing';
 
 export type OnStepError = 'abort' | 'continue';
 
@@ -65,6 +66,12 @@ export interface AgentExecution {
   outputTokens?: number;
   latencyMs?: number;
   error?: string;
+  canonDaaConfig?: {
+    protocolVersion: string;
+    endpoint: string;
+    authToken?: string;
+    timeoutMs?: number;
+  };
 }
 
 export interface Artifact {

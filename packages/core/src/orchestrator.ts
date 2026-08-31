@@ -223,7 +223,7 @@ export class Orchestrator {
         await persistence.executions.update(execution);
         executions.push(execution);
 
-        if (execution.status === 'completed') {
+        if (execution.status === 'completed' || execution.status === 'canon_daa_executing') {
           completedArtifacts.set(step.id, producedArtifacts);
         } else if (execution.status === 'failed') {
           failedSteps.add(step.id);
