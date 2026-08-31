@@ -109,3 +109,4 @@ export interface Artifact {
   content: unknown;
   evidence?: unknown[];
 }
+ 
