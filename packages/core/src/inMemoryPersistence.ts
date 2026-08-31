@@ -19,12 +19,32 @@ class InMemoryTaskRepository implements TaskRepository {
     this.store.set(task.id, task);
   }
 
+  async createMany(tasks: Task[]): Promise<void> {
+    for (const task of tasks) {
+      this.store.set(task.id, task);
+    }
+  }
+
   async get(taskId: string): Promise<Task | null> {
     return this.store.get(taskId) ?? null;
   }
 
+  async getMany(taskIds: string[]): Promise<Map<string, Task | null>> {
+    const result = new Map<string, Task | null>();
+    for (const id of taskIds) {
+      result.set(id, this.store.get(id) ?? null);
+    }
+    return result;
+  }
+
   async update(task: Task): Promise<void> {
     this.store.set(task.id, task);
+  }
+
+  async updateMany(tasks: Task[]): Promise<void> {
+    for (const task of tasks) {
+      this.store.set(task.id, task);
+    }
   }
 }
 
@@ -86,11 +106,54 @@ class InMemoryArtifactRepository implements ArtifactRepository {
   }
 }
 
+class InMemoryTransaction implements Transaction {
+  private committed = false;
+
+  constructor(private readonly persistence: InMemoryPersistence) {}
+
+  async commit(): Promise<void> {
+    this.committed = true;
+  }
+
+  async rollback(): Promise<void> {
+    if (!this.committed) {
+      this.persistence.rollbackTransaction();
+    }
+  }
+}
+
 export class InMemoryPersistence implements Persistence {
+  private transactionStack: Map<string, unknown>[] = [];
   public readonly tasks: TaskRepository = new InMemoryTaskRepository();
   public readonly runs: RunRepository = new InMemoryRunRepository();
   public readonly executions: ExecutionRepository = new InMemoryExecutionRepository();
   public readonly artifacts: ArtifactRepository = new InMemoryArtifactRepository();
+
+  private snapshotStore(): Map<string, unknown>[] {
+    return [
+      new Map(this.tasks['store']),
+      new Map(this.runs['store']),
+      new Map(this.executions['store']),
+      new Map(this.artifacts['store'])
+    ];
+  }
+
+  async beginTransaction(): Promise<Transaction> {
+    this.transactionStack.push(this.snapshotStore());
+    return new InMemoryTransaction(this);
+  }
+
+  rollbackTransaction(): void {
+    if (this.transactionStack.length > 0) {
+      const snapshot = this.transactionStack.pop();
+      if (snapshot) {
+        this.tasks['store'] = new Map(snapshot[0]);
+        this.runs['store'] = new Map(snapshot[1]);
+        this.executions['store'] = new Map(snapshot[2]);
+        this.artifacts['store'] = new Map(snapshot[3]);
+      }
+    }
+  }
 }
 
 export function createInMemoryPersistence(): Persistence {

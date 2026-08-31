@@ -7,8 +7,11 @@ import {
 
 export interface TaskRepository {
   create(task: Task): Promise<void>;
+  createMany(tasks: Task[]): Promise<void>;
   get(taskId: string): Promise<Task | null>;
+  getMany(taskIds: string[]): Promise<Map<string, Task | null>>;
   update(task: Task): Promise<void>;
+  updateMany(tasks: Task[]): Promise<void>;
 }
 
 export interface RunRepository {
