@@ -155,7 +155,6 @@ export class InMemoryPersistence implements Persistence {
       }
     }
   }
-}
 
 export function createInMemoryPersistence(): Persistence {
   return new InMemoryPersistence();
