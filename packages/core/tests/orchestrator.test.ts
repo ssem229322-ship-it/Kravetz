@@ -704,6 +704,8 @@ describe('LocalHandlerRuntime', () => {
   });
 
   it('preserves continue semantics when a local handler fails', async () => {
+    // Test case verifies workflow continues after failure 
+    // when onStepError='continue'
     const persistence = createPersistence();
     const runtime = new LocalHandlerRuntime({
       handlers: {
