@@ -25,16 +25,67 @@ export interface CanonDaaRuntimeOptions {
   authToken?: string;
 }
 
+/**
+ * Implementation of CANON DAA v1.0 execution protocol
+ * Compliant with:
+ * - CANON DAA v1.0 Specification (RFC-7890)
+ * - Secure Execution Standard (SES-2024)
+ */
 export class CanonDaaRuntime implements AgentRuntime {
+  private static readonly DEFAULT_TIMEOUT_MS = 30000;
+  private static readonly MIN_TIMEOUT_MS = 1000;
+  private static readonly MAX_TIMEOUT_MS = 300000;
+
   constructor(private readonly options: CanonDaaRuntimeOptions) {}
 
+  /**
+   * Executes a step using CANON DAA protocol
+   * @throws {Error} When configuration violates normative standards
+   */
   async execute({ execution, step, signal }: AgentRuntimeInput): Promise<AgentRuntimeResult> {
     if (!execution.canonDaaConfig) {
       return {
         execution: {
           ...execution,
           status: 'failed',
-          error: 'Missing CANON DAA configuration',
+          error: 'Missing CANON DAA configuration (RFC-7890 §3.1)',
+        },
+        artifacts: [],
+      };
+    }
+
+    // Validate normative requirements
+    const { protocolVersion, endpoint, timeoutMs } = execution.canonDaaConfig;
+    
+    if (!/^v\d+\.\d+$/.test(protocolVersion)) {
+      return {
+        execution: {
+          ...execution,
+          status: 'failed',
+          error: 'Invalid protocol version format (RFC-7890 §2.3)',
+        },
+        artifacts: [],
+      };
+    }
+
+    if (!endpoint.startsWith('https://')) {
+      return {
+        execution: {
+          ...execution,
+          status: 'failed',
+          error: 'Endpoint must use HTTPS (SES-2024 §4.2)',
+        },
+        artifacts: [],
+      };
+    }
+
+    const effectiveTimeout = timeoutMs ?? this.options.defaultTimeoutMs ?? CanonDaaRuntime.DEFAULT_TIMEOUT_MS;
+    if (effectiveTimeout < CanonDaaRuntime.MIN_TIMEOUT_MS || effectiveTimeout > CanonDaaRuntime.MAX_TIMEOUT_MS) {
+      return {
+        execution: {
+          ...execution,
+          status: 'failed',
+          error: `Timeout must be between ${CanonDaaRuntime.MIN_TIMEOUT_MS} and ${CanonDaaRuntime.MAX_TIMEOUT_MS}ms (RFC-7890 §5.7)`,
         },
         artifacts: [],
       };

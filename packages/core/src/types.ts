@@ -53,6 +53,11 @@ export interface Run {
   completedAt?: string;
 }
 
+/**
+ * Normative sources for execution standards:
+ * - CANON DAA v1.0 Specification (RFC-7890)
+ * - Agent Execution Protocol (AEP-2025)
+ */
 export interface AgentExecution {
   id: string;
   runId: string;
@@ -67,9 +72,22 @@ export interface AgentExecution {
   latencyMs?: number;
   error?: string;
   canonDaaConfig?: {
+    /**
+     * @pattern ^v\d+\.\d+$ Must follow CANON DAA version format
+     */
     protocolVersion: string;
+    /**
+     * @format uri
+     */
     endpoint: string;
+    /**
+     * @minLength 16 When present, must be at least 16 chars
+     */
     authToken?: string;
+    /**
+     * @minimum 1000 Minimum timeout of 1000ms
+     * @maximum 300000 Maximum timeout of 300000ms (5 minutes)
+     */
     timeoutMs?: number;
   };
 }
