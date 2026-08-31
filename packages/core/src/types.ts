@@ -3,14 +3,16 @@ export type TaskStatus =
   | 'running'
   | 'completed'
   | 'failed'
-  | 'skipped';
+  | 'skipped'
+  | 'cancelled';
 
 export type RunStatus =
   | 'pending'
   | 'running'
   | 'completed'
   | 'failed'
-  | 'partial';
+  | 'partial'
+  | 'cancelled';
 
 export type ExecutionStatus =
   | 'pending'
@@ -18,7 +20,8 @@ export type ExecutionStatus =
   | 'completed'
   | 'failed'
   | 'skipped'
-  | 'canon_daa_executing';
+  | 'canon_daa_executing'
+  | 'cancelled';
 
 export type OnStepError = 'abort' | 'continue';
 
