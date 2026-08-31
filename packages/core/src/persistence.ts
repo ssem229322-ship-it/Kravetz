@@ -81,6 +81,9 @@ class InMemoryTaskRepository implements TaskRepository {
   async updateMany(tasks: Task[]): Promise<void> {
     tasks.forEach((task) => this.store.set(task.id, task));
   }
+  async delete(taskId: string): Promise<void> {
+    this.store.delete(taskId);
+  }
 }
 
 class InMemoryRunRepository implements RunRepository {
