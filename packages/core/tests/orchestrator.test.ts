@@ -411,7 +411,7 @@ describe('Orchestrator validation', () => {
       { id: 'step-2', agentVersionId: 'agent-b', inputMapping: { value: '$prev.step-1' } },
       { id: 'step-3', agentVersionId: 'agent-c', inputMapping: { value: '$prev.step-2' } },
     ], 'continue');
-  
+
     const result = await orchestrator.execute(task);
 
     expect(result.executions.map((execution) => execution.status)).toEqual([
