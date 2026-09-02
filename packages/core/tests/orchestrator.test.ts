@@ -22,22 +22,24 @@ function createPersistence(): Persistence {
       async create(task) {
         tasks.set(task.id, task);
       },
-      async createMany(taskList) {
-        taskList.forEach(t => tasks.set(t.id, t));
-      },
       async get(taskId) {
         return tasks.get(taskId) ?? null;
-      },
-      async getMany(taskIds) {
-        const result = new Map<string, Task | null>();
-        taskIds.forEach(id => result.set(id, tasks.get(id) ?? null));
-        return result;
       },
       async update(task) {
         tasks.set(task.id, task);
       },
+      async createMany(taskList) {
+        taskList.forEach(task => tasks.set(task.id, task));
+      },
+      async getMany(taskIds) {
+        const result = new Map<string, Task | null>();
+        taskIds.forEach(id => {
+          result.set(id, tasks.get(id) || null);
+        });
+        return result;
+      },
       async updateMany(taskList) {
-        taskList.forEach(t => tasks.set(t.id, t));
+        taskList.forEach(task => tasks.set(task.id, task));
       },
     },
 

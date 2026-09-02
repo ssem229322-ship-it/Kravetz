@@ -64,7 +64,7 @@ export interface AgentExecution {
   id: string;
   runId: string;
   stepId: string;
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'canon_daa_executing';
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
   input: Record<string, unknown>;
   outputArtifactIds: string[];
   model?: string;
