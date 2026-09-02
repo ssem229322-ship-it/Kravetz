@@ -12,7 +12,6 @@ import {
   TaskRepository,
 } from './persistence.js';
 
- 
 class InMemoryTaskRepository implements TaskRepository {
   private readonly store = new Map<string, Task>();
 
@@ -107,57 +106,12 @@ class InMemoryArtifactRepository implements ArtifactRepository {
   }
 }
 
-class InMemoryTransaction implements Transaction {
-  private committed = false;
-  private readonly transactionId: string;
-
-  constructor(private readonly persistence: InMemoryPersistence) {
-    this.transactionId = crypto.randomUUID();
-  }
-
-  async commit(): Promise<void> {
-    this.committed = true;
-  }
-
-  async rollback(): Promise<void> {
-    if (!this.committed) {
-      this.persistence.rollbackTransaction(this.transactionId);
-    }
-  }
-}
-
 export class InMemoryPersistence implements Persistence {
-  private transactionStack: Map<string, unknown>[] = [];
   public readonly tasks: TaskRepository = new InMemoryTaskRepository();
   public readonly runs: RunRepository = new InMemoryRunRepository();
   public readonly executions: ExecutionRepository = new InMemoryExecutionRepository();
   public readonly artifacts: ArtifactRepository = new InMemoryArtifactRepository();
-
-  private snapshotStore(): Map<string, unknown>[] {
-    return [
-      new Map(this.tasks['store']),
-      new Map(this.runs['store']),
-      new Map(this.executions['store']),
-      new Map(this.artifacts['store'])
-    ];
-  }
-
-  async beginTransaction(): Promise<Transaction> {
-    this.transactionStack.push(this.snapshotStore());
-    return new InMemoryTransaction(this);
-  }
-
-  rollbackTransaction(transactionId: string): void {
-    if (this.transactionStack.length > 0) {
-      const snapshot = this.transactionStack.pop();
-      if (snapshot) {
-        this.tasks['store'] = new Map(snapshot[0]);
-        this.runs['store'] = new Map(snapshot[1]);
-        this.executions['store'] = new Map(snapshot[2]);
-        this.artifacts['store'] = new Map(snapshot[3]);
-      }
-    }
-  }
+}
 
 export function createInMemoryPersistence(): Persistence {
   return new InMemoryPersistence();

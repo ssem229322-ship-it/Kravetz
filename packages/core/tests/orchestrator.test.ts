@@ -22,11 +22,22 @@ function createPersistence(): Persistence {
       async create(task) {
         tasks.set(task.id, task);
       },
+      async createMany(taskList) {
+        taskList.forEach(t => tasks.set(t.id, t));
+      },
       async get(taskId) {
         return tasks.get(taskId) ?? null;
       },
+      async getMany(taskIds) {
+        const result = new Map<string, Task | null>();
+        taskIds.forEach(id => result.set(id, tasks.get(id) ?? null));
+        return result;
+      },
       async update(task) {
         tasks.set(task.id, task);
+      },
+      async updateMany(taskList) {
+        taskList.forEach(t => tasks.set(t.id, t));
       },
     },
 
@@ -330,7 +341,7 @@ describe('Orchestrator validation', () => {
       },
     ]);
 
-    await expect(orchestrator.execute(task)).rejects.toThrowError(/\$prev.*missing-step/i);
+    await expect(orchestrator.execute(task)).rejects.toThrow(/\$prev.*missing-step/i);
   });
 
   it('rejects $prev references to future steps according to current execution semantics', async () => {
@@ -359,7 +370,7 @@ describe('Orchestrator validation', () => {
       },
     ]);
 
-    await expect(orchestrator.execute(task)).rejects.toThrowError(/future or current step/i);
+    await expect(orchestrator.execute(task)).rejects.toThrow(/future or current step/i);
   });
 
   it('skips transitive dependencies when an upstream step fails', async () => {
