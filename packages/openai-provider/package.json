@@ -1,5 +1,5 @@
 {
-  "name": "@kraken/openai-provider",
+  "name": "@kraken/openrouter-provider",
   "version": "0.1.0",
   "private": true,
   "type": "module"

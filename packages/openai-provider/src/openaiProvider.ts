@@ -15,33 +15,33 @@ interface ChatCompletionResponse {
   error?: { message?: string };
 }
 
-export interface OpenAIProviderOptions {
+export interface OpenRouterProviderOptions {
   apiKey: string;
   endpoint?: string;
   fetchImpl?: typeof fetch;
 }
 
-export class OpenAIProviderAdapter implements ProviderAdapter {
+export class OpenRouterProviderAdapter implements ProviderAdapter {
   private readonly endpoint: string;
   private readonly fetchImpl: typeof fetch;
 
-  constructor(private readonly options: OpenAIProviderOptions) {
-    this.endpoint = options.endpoint ?? 'https://api.openai.com/v1/chat/completions';
+  constructor(private readonly options: OpenRouterProviderOptions) {
+    this.endpoint = options.endpoint ?? 'https://openrouter.ai/api/v1/chat/completions';
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
   static fromEnv(
     environment: NodeJS.ProcessEnv = process.env,
     fetchImpl?: typeof fetch,
-  ): OpenAIProviderAdapter {
-    const apiKey = environment.OPENAI_API_KEY;
+  ): OpenRouterProviderAdapter {
+    const apiKey = environment.OPENROUTER_API_KEY;
     if (!apiKey) {
-      throw new ProviderError('OPENAI_API_KEY is required for the OpenAI provider');
+      throw new ProviderError('OPENROUTER_API_KEY is required for the OpenRouter provider');
     }
 
-    return new OpenAIProviderAdapter({
+    return new OpenRouterProviderAdapter({
       apiKey,
-      endpoint: environment.OPENAI_API_URL,
+      endpoint: environment.OPENROUTER_API_URL,
       fetchImpl,
     });
   }
@@ -65,14 +65,14 @@ export class OpenAIProviderAdapter implements ProviderAdapter {
     const content = payload.choices?.[0]?.message?.content;
 
     if (!content) {
-      throw new ProviderError('OpenAI response did not contain message content');
+      throw new ProviderError('OpenRouter response did not contain message content');
     }
 
     let parsedContent: unknown;
     try {
       parsedContent = JSON.parse(content);
     } catch (error) {
-      throw new ProviderError('OpenAI response was not valid JSON', { cause: error });
+      throw new ProviderError('OpenRouter response was not valid JSON', { cause: error });
     }
 
     return {
@@ -95,7 +95,7 @@ export class OpenAIProviderAdapter implements ProviderAdapter {
   private async readResponse(response: Response): Promise<ChatCompletionResponse> {
     const payload = await response.json() as ChatCompletionResponse;
     if (!response.ok) {
-      throw new ProviderError(payload.error?.message ?? `OpenAI request failed with status ${response.status}`);
+      throw new ProviderError(payload.error?.message ?? `OpenRouter request failed with status ${response.status}`);
     }
 
     return payload;

@@ -4,18 +4,18 @@ import { createInMemoryPersistence } from '../../core/src/inMemoryPersistence.js
 import { Orchestrator } from '../../core/src/orchestrator.js';
 import { AgentVersion, Model, ModelVersion } from '../../core/src/types.js';
 import { DeterministicEvaluator } from '../../core/src/validation.js';
-import { OpenAIProviderAdapter } from '../src/openaiProvider.js';
+import { OpenRouterProviderAdapter } from '../src/openaiProvider.js';
 
-const runRealIntegration = process.env.OPENAI_API_KEY ? it : it.skip;
+const runRealIntegration = process.env.OPENROUTER_API_KEY ? it : it.skip;
 
-describe('OpenAI real integration', () => {
-  runRealIntegration('executes a Task through the real LLM and evaluates its Artifact (requires OPENAI_API_KEY)', async () => {
-    const model: Model = { id: process.env.OPENAI_MODEL ?? 'gpt-4o-mini' };
+describe('OpenRouter real integration', () => {
+  runRealIntegration('executes a Task through the real LLM and evaluates its Artifact (requires OPENROUTER_API_KEY)', async () => {
+    const model: Model = { id: process.env.OPENROUTER_MODEL ?? 'meta-llama/llama-3.3-70b-instruct' };
     const modelVersion: ModelVersion = {
-      id: 'openai-real-model-v1',
+      id: 'openrouter-real-model-v1',
       modelId: model.id,
       version: '1',
-      providerId: 'openai',
+      providerId: 'openrouter',
     };
     const agentVersion: AgentVersion = {
       id: 'real-agent-v1',
@@ -30,7 +30,7 @@ describe('OpenAI real integration', () => {
         [modelVersion.id]: new ProviderModelClient(
           model,
           modelVersion,
-          OpenAIProviderAdapter.fromEnv(),
+          OpenRouterProviderAdapter.fromEnv(),
         ),
       },
     });
@@ -58,7 +58,7 @@ describe('OpenAI real integration', () => {
 
     expect(execution.status).toBe('completed');
     expect(execution.model).toBe(model.id);
-    expect(execution.provider).toBe('openai');
+    expect(execution.provider).toBe('openrouter');
     expect(artifact.id).toBe(result.run.finalArtifactId);
     expect(artifact.runId).toBe(result.run.id);
     expect(artifact.executionId).toBe(execution.id);
