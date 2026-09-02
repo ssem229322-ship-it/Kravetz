@@ -6,6 +6,7 @@ export * from './agentRuntime';
 export * from './modelProvider';
 export * from './validation';
 export * from './learning';
+export * from './experiments';
 export * from './persistence';
 export * from './inMemoryPersistence';
 

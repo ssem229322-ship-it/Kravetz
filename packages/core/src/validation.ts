@@ -30,6 +30,10 @@ export interface Decision {
   readonly evaluationId: string;
   readonly artifactId: string;
   readonly outcome: DecisionOutcome;
+  readonly comparisonId?: string;
+  readonly baselineEvaluationId?: string;
+  readonly candidateEvaluationId?: string;
+  readonly reason?: string;
 }
 
 export class DeterministicEvaluator implements Evaluator {
