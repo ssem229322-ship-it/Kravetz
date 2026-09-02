@@ -109,8 +109,11 @@ class InMemoryArtifactRepository implements ArtifactRepository {
 
 class InMemoryTransaction implements Transaction {
   private committed = false;
+  private readonly transactionId: string;
 
-  constructor(private readonly persistence: InMemoryPersistence) {}
+  constructor(private readonly persistence: InMemoryPersistence) {
+    this.transactionId = crypto.randomUUID();
+  }
 
   async commit(): Promise<void> {
     this.committed = true;
@@ -118,7 +121,7 @@ class InMemoryTransaction implements Transaction {
 
   async rollback(): Promise<void> {
     if (!this.committed) {
-      this.persistence.rollbackTransaction();
+      this.persistence.rollbackTransaction(this.transactionId);
     }
   }
 }
@@ -144,7 +147,7 @@ export class InMemoryPersistence implements Persistence {
     return new InMemoryTransaction(this);
   }
 
-  rollbackTransaction(): void {
+  rollbackTransaction(transactionId: string): void {
     if (this.transactionStack.length > 0) {
       const snapshot = this.transactionStack.pop();
       if (snapshot) {
