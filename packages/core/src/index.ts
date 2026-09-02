@@ -8,6 +8,7 @@ export * from './validation';
 export * from './learning';
 export * from './experiments';
 export * from './review';
+export * from './metaEvaluation';
 export * from './persistence';
 export * from './inMemoryPersistence';
 
