@@ -60,7 +60,20 @@ export interface Run {
  */
 export interface Model {
   id: string;
-  version?: string;
+  displayName?: string;
+}
+
+export interface ModelVersion {
+  id: string;
+  modelId: string;
+  version: string;
+  providerId: string;
+}
+
+export interface AgentVersion {
+  id: string;
+  modelVersionId: string;
+  configuration: Readonly<Record<string, unknown>>;
 }
 
 /**
@@ -72,6 +85,25 @@ export interface Model {
  */
 export interface Provider {
   id: string;
+}
+
+export interface ProviderRequest {
+  input: Record<string, unknown>;
+  model: Model;
+  modelVersion: ModelVersion;
+  signal?: AbortSignal;
+}
+
+export interface ProviderResponse {
+  content: unknown;
+  contentType?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+}
+
+export interface ProviderAdapter {
+  provider: Provider;
+  generate(request: ProviderRequest): Promise<ProviderResponse>;
 }
 
 /**

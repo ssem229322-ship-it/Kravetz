@@ -3,9 +3,6 @@ module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/packages'],
   testMatch: ['**/?(*.)+(spec|test).[tj]s?(x)'],
-  transform: {
-    '^.+\\.tsx?$': 'ts-jest',
-  },
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
