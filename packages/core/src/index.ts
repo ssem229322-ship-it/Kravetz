@@ -4,6 +4,7 @@ export * from './types';
 
 export * from './agentRuntime';
 export * from './modelProvider';
+export * from './validation';
 export * from './persistence';
 export * from './inMemoryPersistence';
 
