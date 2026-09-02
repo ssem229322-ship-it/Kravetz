@@ -51,6 +51,30 @@ export interface Run {
 }
 
 /**
+ * Model represents a versioned AI model.
+ * Identifies and describes a model instance that can be executed by a Provider.
+ *
+ * Invariants:
+ * - model.id identifies the model uniquely (e.g., "gpt-4", "claude-3-opus", "gemini-pro")
+ * - model.version is optional and denotes a specific version if tracked
+ */
+export interface Model {
+  id: string;
+  version?: string;
+}
+
+/**
+ * Provider represents an execution provider capable of running models.
+ * Identifies the provider that executed an AgentExecution.
+ * 
+ * Invariants:
+ * - provider.id identifies the provider uniquely (e.g., "openai", "anthropic", "google")
+ */
+export interface Provider {
+  id: string;
+}
+
+/**
  * AgentExecution represents the execution of a single step.
  * Tracks input, output artifacts, and execution metadata.
  *
@@ -59,6 +83,8 @@ export interface Run {
  * - execution.runId references a real Run
  * - execution.stepId references a real WorkflowStep in the parent Task
  * - execution.outputArtifactIds correspond to Artifacts with matching executionId
+ * - execution.model (if present) stores Model.id from the model that executed this step
+ * - execution.provider (if present) stores Provider.id from the provider that executed this step
  */
 export interface AgentExecution {
   id: string;
