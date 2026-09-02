@@ -38,7 +38,6 @@ function setup(provider: Provider, content: string) {
     configuration: Object.freeze({ temperature: 0 }),
   };
   const adapter: ProviderAdapter = {
-    provider,
     async generate() {
       return { content, contentType: 'text/plain' };
     },

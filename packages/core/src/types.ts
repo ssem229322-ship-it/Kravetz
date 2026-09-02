@@ -102,7 +102,6 @@ export interface ProviderResponse {
 }
 
 export interface ProviderAdapter {
-  provider: Provider;
   generate(request: ProviderRequest): Promise<ProviderResponse>;
 }
 
