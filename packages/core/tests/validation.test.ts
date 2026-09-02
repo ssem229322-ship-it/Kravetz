@@ -1,5 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
+import { LocalHandlerRuntime } from '../src/agentRuntime.js';
+import { Orchestrator } from '../src/orchestrator.js';
 import { Artifact } from '../src/types.js';
+import { createInMemoryPersistence } from '../src/inMemoryPersistence.js';
 import { decide, DeterministicEvaluator, EvaluationPolicy } from '../src/validation.js';
 
 const policy: EvaluationPolicy = {
@@ -56,5 +59,63 @@ describe('DeterministicEvaluator', () => {
 
     expect(Object.isFrozen(evaluation)).toBe(true);
     expect(Object.isFrozen(evaluation.checks)).toBe(true);
+  });
+});
+
+describe('Execution to decision integration', () => {
+  async function evaluateExecution(content: unknown) {
+    const persistence = createInMemoryPersistence();
+    const orchestrator = new Orchestrator({
+      persistence,
+      runtime: new LocalHandlerRuntime({
+        handlers: {
+          'agent-v1': () => content,
+        },
+      }),
+      generateId: (() => {
+        let counter = 0;
+        return () => `integration-${++counter}`;
+      })(),
+      now: () => '2026-09-02T00:00:00.000Z',
+    });
+    const result = await orchestrator.execute({
+      id: 'task-validation-integration',
+      input: {},
+      workflowDefinition: {
+        steps: [{ id: 'step-1', agentVersionId: 'agent-v1', inputMapping: {} }],
+        onStepError: 'abort',
+        finalStepId: 'step-1',
+      },
+      status: 'pending',
+      createdAt: '2026-09-02T00:00:00.000Z',
+      updatedAt: '2026-09-02T00:00:00.000Z',
+    });
+    const finalArtifact = result.artifacts.find(
+      (item) => item.id === result.run.finalArtifactId,
+    );
+
+    if (!finalArtifact) {
+      throw new Error('Orchestrator did not produce its final artifact');
+    }
+
+    const evaluation = new DeterministicEvaluator().evaluate(finalArtifact, policy);
+    return { result, evaluation, decision: decide(evaluation) };
+  }
+
+  it('executes an Agent, evaluates its Artifact, and returns ACCEPT', async () => {
+    const { result, evaluation, decision } = await evaluateExecution({ result: 'ok' });
+
+    expect(result.run.finalArtifactId).toBe('artifact-step-1');
+    expect(evaluation.artifactId).toBe(result.run.finalArtifactId);
+    expect(evaluation.passed).toBe(true);
+    expect(decision.outcome).toBe('ACCEPT');
+  });
+
+  it('rejects an invalid Artifact produced by the same execution path', async () => {
+    const { result, evaluation, decision } = await evaluateExecution({ other: 'value' });
+
+    expect(evaluation.artifactId).toBe(result.run.finalArtifactId);
+    expect(evaluation.passed).toBe(false);
+    expect(decision.outcome).toBe('REJECT');
   });
 });
